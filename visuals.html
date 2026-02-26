@@ -438,7 +438,6 @@
     </header>
 
     <section class="section">
-      <p class="kicker">Dependency First</p>
       <h2>Select Output Chunks And See Dependencies</h2>
       <p>In <code>C = A @ B</code>, an output chunk depends on the same row range in <code>A</code> and the same column range in <code>B</code>. Click one corner of <code>C</code>, then the opposite corner.</p>
       <div class="eq" id="dep-eq"></div>
@@ -446,8 +445,9 @@
     </section>
 
     <section class="section">
-      <p class="kicker">Non-Contracting Split</p>
-      <h2>Split Rows (M)</h2>
+      <h2>Splitting Non-Contracting Axes</h2>
+      <p>First split along output rows or columns. These are direct independent subproblems.</p>
+      <p><strong>Split Rows (M)</strong></p>
       <div class="eq">
         <div class="shardops">M/p K, K N -&gt; M/p N</div>
         <div class="shardops-sub" id="row-shardops-sub"></div>
@@ -465,11 +465,8 @@
       <div class="hint" id="row-hint"></div>
       <div class="viz-row" id="row-viz"></div>
       <div class="local-key" id="row-key"></div>
-    </section>
-
-    <section class="section">
-      <p class="kicker">Non-Contracting Split</p>
-      <h2>Split Columns (N)</h2>
+      <hr class="divider">
+      <p><strong>Split Columns (N)</strong></p>
       <div class="eq">
         <div class="shardops">M K, K N/p -&gt; M N/p</div>
         <div class="shardops-sub" id="col-shardops-sub"></div>
@@ -490,33 +487,44 @@
     </section>
 
     <section class="section">
-      <p class="kicker">Contracting Axis Only</p>
-      <h2>Split Only K (Simpler Example)</h2>
+      <h2>Splitting Contraction Axis</h2>
       <p>Here we split only the contracting axis <code>K</code>. First do one dot product, then batch the same idea across all dot products in a matmul.</p>
+      <p><strong>Splitting K in a Dot Product</strong></p>
       <div class="controls">
         <div class="k-step">
-          <span>K splits</span>
-          <button id="ct-p-dec" type="button">-</button>
-          <code id="ct-p">1</code>
-          <button id="ct-p-inc" type="button">+</button>
+          <span>p</span>
+          <button id="ct-dot-p-dec" type="button">-</button>
+          <code id="ct-dot-p">1</code>
+          <button id="ct-dot-p-inc" type="button">+</button>
         </div>
       </div>
       <div class="eq" id="ct-eq-dot"></div>
+      <div class="eq" id="ct-einsum-dot"></div>
+      <div class="hint" id="ct-koverp-dot"></div>
       <div class="viz-row" id="ct-dot-viz"></div>
       <hr class="divider">
+      <p><strong>Splitting K in a Matmul</strong></p>
+      <div class="controls">
+        <div class="k-step">
+          <span>p</span>
+          <button id="ct-mm-p-dec" type="button">-</button>
+          <code id="ct-mm-p">1</code>
+          <button id="ct-mm-p-inc" type="button">+</button>
+        </div>
+      </div>
       <div class="eq" id="ct-eq-mm"></div>
+      <div class="eq" id="ct-einsum-mm"></div>
+      <div class="hint" id="ct-koverp-mm"></div>
       <div class="viz-row" id="ct-mm-viz"></div>
-      <p class="note">A matmul is a batch of dot products. Splitting <code>K</code> gives <code>p</code> partial terms, then summing those terms gives the same result.</p>
     </section>
 
     <section class="section">
-      <p class="kicker">Combined Kernel</p>
       <h2>Split-K Kernels</h2>
       <p>GPUs combine both ideas: split work across output tiles (non-contracting axes), and loop over <code>K</code> chunks for each tile.</p>
-      <p>Click a tile in <code>C</code> to see its input dependencies, then step through the <code>K/p</code> accumulator updates.</p>
+      <p>Click a tile in <code>C</code> to see its input dependencies, then step through accumulator updates across splits of <code>K</code>.</p>
       <div class="controls">
         <div class="k-step">
-          <span>K splits</span>
+            <span>splits of K</span>
           <button id="k-p-dec" type="button">-</button>
           <code id="k-p">1</code>
           <button id="k-p-inc" type="button">+</button>
@@ -557,7 +565,8 @@
   const PART_DARK = ["#2563eb", "#7c3aed", "#059669", "#d97706", "#e11d48", "#0284c7", "#6d28d9", "#c2410c", "#0f766e"];
   let rowPIdx = 0;
   let colPIdx = 0;
-  let ctPIdx = 0;
+  let ctDotPIdx = 0;
+  let ctMmPIdx = 0;
   let kPIdx = 0;
   let kStep = 0;
   let tileSel = { tr: 0, tc: 0 };
@@ -836,8 +845,8 @@
     rowPIdx = Math.max(0, Math.min(rowPIdx, ps.length - 1));
     const p = ps[rowPIdx];
     document.getElementById("row-p").textContent = String(p);
-    document.getElementById("row-hint").textContent = `Valid p for M=${M}: ${ps.join(", ")}.`;
-    document.getElementById("row-shardops-sub").textContent = `(p=${p}) (M/p=${M / p}) K, K N -> (M/p=${M / p}) N`;
+    document.getElementById("row-hint").textContent = "";
+    document.getElementById("row-shardops-sub").textContent = `(M/p) = ${M / p}`;
     renderKey("row-key", p);
 
     const root = document.getElementById("row-viz");
@@ -869,7 +878,7 @@
     const p = ps[colPIdx];
     document.getElementById("col-p").textContent = String(p);
     document.getElementById("col-hint").textContent = `Valid p for N=${N}: ${ps.join(", ")}.`;
-    document.getElementById("col-shardops-sub").textContent = `(p=${p}) M K, K (N/p=${N / p}) -> M (N/p=${N / p})`;
+    document.getElementById("col-shardops-sub").textContent = `(N/p) = ${N / p}`;
     renderKey("col-key", p);
 
     const root = document.getElementById("col-viz");
@@ -897,13 +906,20 @@
     const K = K_FIXED;
     const N = N_FIXED;
     const ps = divisors(K);
-    ctPIdx = Math.max(0, Math.min(ctPIdx, ps.length - 1));
-    const p = ps[ctPIdx];
-    document.getElementById("ct-p").textContent = String(p);
-    const chunk = K / p;
+    ctDotPIdx = Math.max(0, Math.min(ctDotPIdx, ps.length - 1));
+    ctMmPIdx = Math.max(0, Math.min(ctMmPIdx, ps.length - 1));
+    const pDot = ps[ctDotPIdx];
+    const pMm = ps[ctMmPIdx];
+    document.getElementById("ct-dot-p").textContent = String(pDot);
+    document.getElementById("ct-mm-p").textContent = String(pMm);
+    const chunkDot = K / pDot;
+    const chunkMm = K / pMm;
 
     document.getElementById("ct-eq-dot").textContent =
-      `One dot product: compute p partial dot products, then sum.`;
+      `Sum up all ${pDot} partial dot products.`;
+    document.getElementById("ct-einsum-dot").textContent =
+      `sum of ${pDot} einsum(\"K/p, K/p -> 1\") = einsum(\"K, K -> 1\")`;
+    document.getElementById("ct-koverp-dot").textContent = `K/p = ${chunkDot}`;
     const dotRoot = document.getElementById("ct-dot-viz");
     clear(dotRoot);
     const dotOverview = document.createElement("div");
@@ -912,9 +928,9 @@
     const aAll = makeMatrix(dotOverview, `a (1x${K})`, 1, K);
     addOp(dotOverview, "x");
     const bAll = makeMatrix(dotOverview, `b (${K}x1)`, K, 1);
-    for (let i = 0; i < p; i++) {
-      const k0 = i * chunk;
-      const k1 = (i + 1) * chunk - 1;
+    for (let i = 0; i < pDot; i++) {
+      const k0 = i * chunkDot;
+      const k1 = (i + 1) * chunkDot - 1;
       for (const cell of aAll.cells) {
         const cc = Number(cell.dataset.c);
         if (cc >= k0 && cc <= k1) cell.style.background = partColor(i);
@@ -928,9 +944,9 @@
     dotOverviewSep.className = "part-sep";
     dotRoot.appendChild(dotOverviewSep);
 
-    for (let i = 0; i < p; i++) {
-      const k0 = i * chunk;
-      const k1 = (i + 1) * chunk - 1;
+    for (let i = 0; i < pDot; i++) {
+      const k0 = i * chunkDot;
+      const k1 = (i + 1) * chunkDot - 1;
       const row = document.createElement("div");
       row.className = "tp-part-row";
       dotRoot.appendChild(row);
@@ -939,15 +955,15 @@
       tag.style.background = PART_DARK[i % PART_DARK.length];
       tag.textContent = `Partition ${i + 1}`;
       row.appendChild(tag);
-      const ai = makeMatrix(row, `a[${k0}:${k1 + 1}]`, 1, chunk);
+      const ai = makeMatrix(row, `a[${k0}:${k1 + 1}]`, 1, chunkDot);
       addOp(row, "x");
-      const bi = makeMatrix(row, `b[${k0}:${k1 + 1}]`, chunk, 1);
+      const bi = makeMatrix(row, `b[${k0}:${k1 + 1}]`, chunkDot, 1);
       addOp(row, "=");
       const ci = makeMatrix(row, `c_${i + 1}`, 1, 1);
       colorAll(ai, partColor(i));
       colorAll(bi, partColor(i));
       colorAll(ci, partColor(i));
-      if (i < p - 1) {
+      if (i < pDot - 1) {
         const sep = document.createElement("hr");
         sep.className = "part-sep";
         dotRoot.appendChild(sep);
@@ -957,10 +973,12 @@
     const dotFinalSep = document.createElement("hr");
     dotFinalSep.className = "part-sep";
     dotRoot.appendChild(dotFinalSep);
-    addSymbolicEquation(dotRoot, "a x b =", "c", p, "c");
+    addSymbolicEquation(dotRoot, "a x b =", "c", pDot, "c");
 
-    document.getElementById("ct-eq-mm").textContent =
-      `Matmul case: compute p partial matmuls, then sum.`;
+    document.getElementById("ct-eq-mm").textContent = `Sum up all partial matmuls.`;
+    document.getElementById("ct-einsum-mm").textContent =
+      `sum of ${pMm} einsum(\"M K/p, K/p N -> M N\") = einsum(\"M K, K N -> M N\")`;
+    document.getElementById("ct-koverp-mm").textContent = `K/p = ${chunkMm}`;
     const mmRoot = document.getElementById("ct-mm-viz");
     clear(mmRoot);
     const mmOverview = document.createElement("div");
@@ -969,9 +987,9 @@
     const AAll = makeMatrix(mmOverview, `A (${M}x${K})`, M, K);
     addOp(mmOverview, "x");
     const BAll = makeMatrix(mmOverview, `B (${K}x${N})`, K, N);
-    for (let i = 0; i < p; i++) {
-      const k0 = i * chunk;
-      const k1 = (i + 1) * chunk - 1;
+    for (let i = 0; i < pMm; i++) {
+      const k0 = i * chunkMm;
+      const k1 = (i + 1) * chunkMm - 1;
       for (const cell of AAll.cells) {
         const cc = Number(cell.dataset.c);
         if (cc >= k0 && cc <= k1) cell.style.background = partColor(i);
@@ -985,9 +1003,9 @@
     mmOverviewSep.className = "part-sep";
     mmRoot.appendChild(mmOverviewSep);
 
-    for (let i = 0; i < p; i++) {
-      const k0 = i * chunk;
-      const k1 = (i + 1) * chunk - 1;
+    for (let i = 0; i < pMm; i++) {
+      const k0 = i * chunkMm;
+      const k1 = (i + 1) * chunkMm - 1;
       const row = document.createElement("div");
       row.className = "tp-part-row";
       mmRoot.appendChild(row);
@@ -996,15 +1014,15 @@
       tag.style.background = PART_DARK[i % PART_DARK.length];
       tag.textContent = `Partition ${i + 1}`;
       row.appendChild(tag);
-      const Ai = makeMatrix(row, `A[:, ${k0}:${k1 + 1}]`, M, chunk);
+      const Ai = makeMatrix(row, `A[:, ${k0}:${k1 + 1}]`, M, chunkMm);
       addOp(row, "x");
-      const Bi = makeMatrix(row, `B[${k0}:${k1 + 1}, :]`, chunk, N);
+      const Bi = makeMatrix(row, `B[${k0}:${k1 + 1}, :]`, chunkMm, N);
       addOp(row, "=");
       const Ci = makeMatrix(row, `C_${i + 1}`, M, N);
       colorAll(Ai, partColor(i));
       colorAll(Bi, partColor(i));
       colorAll(Ci, partColor(i));
-      if (i < p - 1) {
+      if (i < pMm - 1) {
         const sep = document.createElement("hr");
         sep.className = "part-sep";
         mmRoot.appendChild(sep);
@@ -1014,7 +1032,7 @@
     const mmFinalSep = document.createElement("hr");
     mmFinalSep.className = "part-sep";
     mmRoot.appendChild(mmFinalSep);
-    addSymbolicEquation(mmRoot, "A x B =", "C", p, "C");
+    addSymbolicEquation(mmRoot, "A x B =", "C", pMm, "C");
   }
 
   function renderKSplit() {
@@ -1167,12 +1185,20 @@
     renderColSplit();
   });
 
-  document.getElementById("ct-p-dec").addEventListener("click", () => {
-    ctPIdx = Math.max(0, ctPIdx - 1);
+  document.getElementById("ct-dot-p-dec").addEventListener("click", () => {
+    ctDotPIdx = Math.max(0, ctDotPIdx - 1);
     renderContractSplit();
   });
-  document.getElementById("ct-p-inc").addEventListener("click", () => {
-    ctPIdx = Math.min(divisors(K_FIXED).length - 1, ctPIdx + 1);
+  document.getElementById("ct-dot-p-inc").addEventListener("click", () => {
+    ctDotPIdx = Math.min(divisors(K_FIXED).length - 1, ctDotPIdx + 1);
+    renderContractSplit();
+  });
+  document.getElementById("ct-mm-p-dec").addEventListener("click", () => {
+    ctMmPIdx = Math.max(0, ctMmPIdx - 1);
+    renderContractSplit();
+  });
+  document.getElementById("ct-mm-p-inc").addEventListener("click", () => {
+    ctMmPIdx = Math.min(divisors(K_FIXED).length - 1, ctMmPIdx + 1);
     renderContractSplit();
   });
 
@@ -1209,7 +1235,9 @@
     K_FIXED = num("shape-k", 2, 16);
     N_FIXED = num("shape-n", 2, 16);
     const ks = divisors(K_FIXED);
-    ctPIdx = ks.includes(2) ? ks.indexOf(2) : Math.min(1, Math.max(0, ks.length - 1));
+    const defaultCt = ks.includes(2) ? ks.indexOf(2) : Math.min(1, Math.max(0, ks.length - 1));
+    ctDotPIdx = defaultCt;
+    ctMmPIdx = defaultCt;
     kPIdx = Math.max(0, ks.length - 2);
   }
 
