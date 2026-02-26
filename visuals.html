@@ -429,7 +429,7 @@
   <main class="page">
     <header class="hero">
       <h1>Split One Matmul Into Smaller Matmuls</h1>
-      <p class="lead">Start from output dependencies, then split along non-contracting axes and the contracting axis, and finally combine both in a split-k kernel view.</p>
+      <p class="lead">Choose dimensions of A (M x K) and B (K x N):</p>
       <div class="controls">
         <label class="ctrl">M <input id="shape-m" type="number" min="2" max="16" value="8"></label>
         <label class="ctrl">K <input id="shape-k" type="number" min="2" max="16" value="8"></label>
@@ -439,7 +439,7 @@
 
     <section class="section">
       <h2>Select Output Chunks And See Dependencies</h2>
-      <p>In <code>C = A @ B</code>, an output chunk depends on the same row range in <code>A</code> and the same column range in <code>B</code>. Click one corner of <code>C</code>, then the opposite corner.</p>
+      <p>Click two cells in <code>C</code> to select a region in the output. The region of the inputs it depends on will be highlighted.</p>
       <div class="eq" id="dep-eq"></div>
       <div class="viz-row" id="dep-viz"></div>
     </section>
@@ -485,7 +485,7 @@
 
     <section class="section">
       <h2>Splitting Contraction Axis</h2>
-      <p>Here we split only the contracting axis <code>K</code>. First do one dot product, then batch the same idea across all dot products in a matmul.</p>
+      <p>Here we split only the contracting axis <code>K</code>.</p>
       <p><strong>Splitting K in a Dot Product</strong></p>
       <div class="controls">
         <div class="k-step">
@@ -501,6 +501,7 @@
       <div class="viz-row" id="ct-dot-viz"></div>
       <hr class="divider">
       <p><strong>Splitting K in a Matmul</strong></p>
+      <p>We apply the same idea to all the dot products in a matmul.</p>
       <div class="controls">
         <div class="k-step">
           <span>p</span>
@@ -517,7 +518,7 @@
 
     <section class="section">
       <h2>Split-K Kernels</h2>
-      <p>GPUs combine both ideas: split work across output tiles (non-contracting axes), and loop over <code>K</code> chunks for each tile.</p>
+      <p>GPUs combine both ideas: split work across output tiles (non-contracting axes), and loop over chunks of <code>K</code>.</p>
       <p>Click a tile in <code>C</code> to see its input dependencies, then step through accumulator updates across splits of <code>K</code>.</p>
       <div class="controls">
         <div class="k-step">
@@ -772,7 +773,7 @@
 
     const eq = document.getElementById("dep-eq");
     if (!depRect) {
-      eq.textContent = "Click one C cell, then click another to select an output block.";
+      eq.textContent = "Click two cells in C to select a region in the output. The region of the inputs it depends on will be highlighted.";
       return;
     }
     const { r0, r1, c0, c1 } = depRect;
