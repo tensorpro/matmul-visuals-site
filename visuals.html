@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matmul Sharding Visuals</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --bg: #f8f9fb;
+    --card: #ffffff;
+    --ink: #1a1a2e;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --blue: #93c5fd;
+    --violet: #c4b5fd;
+    --teal: #5eead4;
+    --focus: #fb7185;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    padding: 30px 18px 44px;
+  }
+
+  .page {
+    max-width: 980px;
+    margin: 0 auto;
+    display: grid;
+    gap: 16px;
+  }
+
+  .hero {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  h1 {
+    margin: 0 0 8px;
+    font-size: 29px;
+    letter-spacing: -0.02em;
+  }
+
+  .lead {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.55;
+    max-width: 78ch;
+  }
+
+  .section {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .kicker {
+    margin: 0 0 2px;
+    color: #9ca3af;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    letter-spacing: -0.01em;
+  }
+
+  p {
+    margin: 0 0 10px;
+    color: #334155;
+    line-height: 1.55;
+    font-size: 14px;
+  }
+
+  .eq {
+    margin: 10px 0;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 9px 10px;
+    background: #f8fafc;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow-x: auto;
+    color: #334155;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin: 8px 0 12px;
+  }
+
+  label.ctrl {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-size: 13px;
+    color: #334155;
+  }
+
+  .ctrl input {
+    width: 60px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 4px 6px;
+    font: inherit;
+    text-align: center;
+  }
+
+  .k-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 5px 8px;
+    background: #fff;
+    font-size: 13px;
+    color: #334155;
+  }
+
+  .k-step button {
+    border: 1px solid #d1d5db;
+    background: #f9fafb;
+    color: #334155;
+    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    line-height: 1;
+    font-size: 14px;
+  }
+
+  .k-step code {
+    min-width: 34px;
+    text-align: center;
+    display: inline-block;
+    font-size: 12px;
+    color: #0f172a;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: -6px;
+  }
+
+  .viz-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .mat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .mat-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  .op {
+    font-size: 20px;
+    color: #9ca3af;
+    padding-top: 28px;
+    user-select: none;
+  }
+
+  .grid {
+    display: grid;
+    gap: 1px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    padding: 1px;
+    width: fit-content;
+  }
+
+  .cell {
+    width: 22px;
+    height: 22px;
+    background: #fff;
+    border-radius: 2px;
+    transition: background 0.14s ease, opacity 0.14s ease;
+  }
+
+  .cell.click { cursor: pointer; }
+  .cell.click:hover { background: #f1f5f9; }
+
+  .hl-a { background: var(--blue); }
+  .hl-b { background: var(--violet); }
+  .hl-c { background: var(--teal); }
+  .hl-k { background: #fecdd3; }
+  .hl-sel {
+    background: #fef3c7;
+    box-shadow: inset 0 0 0 2px #f59e0b;
+  }
+
+  .note {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #475569;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px;
+  }
+
+  .partitions-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .partition-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 8px;
+    border: 1px solid #eef2f7;
+    border-radius: 8px;
+    background: #fbfdff;
+  }
+
+  .chip {
+    display: inline-block;
+    background: #f1f5f9;
+    border: 1px solid #dbe3ea;
+    border-radius: 999px;
+    color: #475569;
+    font-size: 11px;
+    padding: 2px 7px;
+    margin-bottom: 6px;
+  }
+
+  .sym-chip {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0f172a;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: #e2e8f0;
+    white-space: nowrap;
+  }
+
+  .sym-plus {
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .sum-eq {
+    display: grid;
+    gap: 6px;
+    font-size: 13px;
+    color: #334155;
+  }
+
+  .sum-lhs-line {
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .sum-rhs-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .legend {
+    display: grid;
+    gap: 4px;
+    margin-top: 10px;
+    max-width: 320px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #475569;
+  }
+
+  .swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .local-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .k-stack {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .tp-block {
+    display: grid;
+    gap: 6px;
+  }
+
+  .tp-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-left: 2px;
+  }
+
+  .tp-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px;
+  }
+
+  .tp-part-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px;
+  }
+
+  .tp-tag {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    border-radius: 999px;
+    padding: 3px 9px;
+    margin-top: 24px;
+  }
+
+  .tp-reduce .tp-row {
+    background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+    border-color: #bbf7d0;
+  }
+
+  .transport {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 10px; background: #fff; border: 1px solid #e5e7eb;
+    border-radius: 10px; padding: 6px 10px;
+  }
+  .transport button {
+    background: none; border: 1px solid #d1d5db; border-radius: 6px;
+    width: 30px; height: 30px; cursor: pointer; color: #374151;
+  }
+  .transport input[type="range"] { width: 150px; accent-color: #6366f1; }
+  .transport .steptext { font-size: 12px; color: #475569; min-width: 140px; text-align: center; }
+  .steptext { font-size: 12px; color: #475569; min-width: 140px; text-align: center; }
+  .splitk-title {
+    font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase;
+    letter-spacing: 0.08em; margin: 4px 0;
+  }
+  .divider {
+    border: none; border-top: 1px dashed #e5e7eb; margin: 8px 0;
+  }
+
+  .part-sep {
+    width: 100%;
+    border: none;
+    border-top: 1px dashed #e5e7eb;
+    margin: 2px 0 4px;
+  }
+
+  @media (max-width: 680px) {
+    .cell { width: 18px; height: 18px; }
+    .op { padding-top: 22px; }
+  }
+</style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <h1>Split One Matmul Into Smaller Matmuls</h1>
+      <p class="lead">Start from output dependencies, then split along non-contracting axes and the contracting axis, and finally combine both in a split-k kernel view.</p>
+      <div class="controls">
+        <label class="ctrl">M <input id="shape-m" type="number" min="2" max="16" value="8"></label>
+        <label class="ctrl">K <input id="shape-k" type="number" min="2" max="16" value="8"></label>
+        <label class="ctrl">N <input id="shape-n" type="number" min="2" max="16" value="8"></label>
+      </div>
+    </header>
+
+    <section class="section">
+      <p class="kicker">Dependency First</p>
+      <h2>Select Output Chunks And See Dependencies</h2>
+      <p>In <code>C = A @ B</code>, an output chunk depends on the same row range in <code>A</code> and the same column range in <code>B</code>. Click one corner of <code>C</code>, then the opposite corner.</p>
+      <div class="eq" id="dep-eq"></div>
+      <div class="viz-row" id="dep-viz"></div>
+    </section>
+
+    <section class="section">
+      <p class="kicker">Non-Contracting Split</p>
+      <h2>Split Rows (M)</h2>
+      <div class="eq">M/p K, K N, -> M/p N</div>
+      <p>Split output rows into <code>p</code> groups. Each group is one smaller matmul over the same <code>K</code>.</p>
+
+      <div class="controls">
+        <div class="k-step">
+          <span>p</span>
+          <button id="row-p-dec" type="button">-</button>
+          <code id="row-p">1</code>
+          <button id="row-p-inc" type="button">+</button>
+        </div>
+      </div>
+      <div class="hint" id="row-hint"></div>
+      <div class="viz-row" id="row-viz"></div>
+      <div class="local-key" id="row-key"></div>
+    </section>
+
+    <section class="section">
+      <p class="kicker">Non-Contracting Split</p>
+      <h2>Split Columns (N)</h2>
+      <div class="eq">M K, K N/p -> M N/p</div>
+      <p>Symmetric case for output columns: split columns into <code>p</code> groups and compute each as a smaller matmul.</p>
+
+      <div class="controls">
+        <div class="k-step">
+          <span>p</span>
+          <button id="col-p-dec" type="button">-</button>
+          <code id="col-p">1</code>
+          <button id="col-p-inc" type="button">+</button>
+        </div>
+      </div>
+      <div class="hint" id="col-hint"></div>
+      <div class="viz-row" id="col-viz"></div>
+      <div class="local-key" id="col-key"></div>
+    </section>
+
+    <section class="section">
+      <p class="kicker">Contracting Axis Only</p>
+      <h2>Split Only K (Simpler Example)</h2>
+      <p>Here we split only the contracting axis <code>K</code>. First do one dot product, then batch the same idea across all dot products in a matmul.</p>
+      <div class="controls">
+        <div class="k-step">
+          <span>K splits</span>
+          <button id="ct-p-dec" type="button">-</button>
+          <code id="ct-p">1</code>
+          <button id="ct-p-inc" type="button">+</button>
+        </div>
+      </div>
+      <div class="eq" id="ct-eq-dot"></div>
+      <div class="viz-row" id="ct-dot-viz"></div>
+      <hr class="divider">
+      <div class="eq" id="ct-eq-mm"></div>
+      <div class="viz-row" id="ct-mm-viz"></div>
+      <p class="note">A matmul is a batch of dot products. Splitting <code>K</code> gives <code>p</code> partial terms, then summing those terms gives the same result.</p>
+    </section>
+
+    <section class="section">
+      <p class="kicker">Combined Kernel</p>
+      <h2>Split-K Kernels</h2>
+      <p>GPUs combine both ideas: split work across output tiles (non-contracting axes), and loop over <code>K</code> chunks for each tile.</p>
+      <p>Click a tile in <code>C</code> to see its input dependencies, then step through the <code>K/p</code> accumulator updates.</p>
+      <div class="controls">
+        <div class="k-step">
+          <span>K splits</span>
+          <button id="k-p-dec" type="button">-</button>
+          <code id="k-p">1</code>
+          <button id="k-p-inc" type="button">+</button>
+        </div>
+        <label class="ctrl">tile M <input id="tile-m" type="number" min="1" max="8" value="2"></label>
+        <label class="ctrl">tile N <input id="tile-n" type="number" min="1" max="8" value="2"></label>
+      </div>
+      <div class="eq" id="tile-eq"></div>
+      <div class="viz-row" id="tile-viz"></div>
+      <div class="transport">
+        <button id="k-prev" type="button" title="Previous">&#9664;</button>
+        <button id="k-next" type="button" title="Next">&#9654;</button>
+        <input id="k-slider" type="range" min="0" max="0" value="0" step="1">
+        <span class="steptext" id="k-step-label"></span>
+      </div>
+      <div class="eq" id="k-eq"></div>
+      <div class="eq" id="k-summary"></div>
+
+      <div class="splitk-title">Accumulator update</div>
+      <div class="viz-row" id="k-viz-current"></div>
+      <hr class="divider">
+      <div class="splitk-title">Inputs accumulated</div>
+      <div class="viz-row" id="k-viz-full"></div>
+      <p class="note">These are exact rewrites of the same matmul, organized into smaller pieces.</p>
+    </section>
+  </main>
+
+<script>
+  let M_FIXED = 8;
+  let K_FIXED = 8;
+  let N_FIXED = 8;
+  const PART_COLORS = [
+    "#7aa2f7", "#f7768e", "#9ece6a", "#e0af68",
+    "#bb9af7", "#7dcfff", "#c0caf5", "#73daca",
+    "#f2cdcd", "#89b4fa", "#94e2d5", "#f9e2af",
+    "#cba6f7", "#a6e3a1", "#74c7ec", "#eba0ac"
+  ];
+  const PART_DARK = ["#2563eb", "#7c3aed", "#059669", "#d97706", "#e11d48", "#0284c7", "#6d28d9", "#c2410c", "#0f766e"];
+  let rowPIdx = 0;
+  let colPIdx = 0;
+  let ctPIdx = 0;
+  let kPIdx = 0;
+  let kStep = 0;
+  let tileSel = { tr: 0, tc: 0 };
+  let depAnchor = null;
+  let depRect = null;
+
+  const num = (id, lo, hi) => {
+    const v = Number(document.getElementById(id).value) || lo;
+    return Math.max(lo, Math.min(hi, v));
+  };
+
+  function nearestDivisor(n, want) {
+    let best = 1;
+    for (let d = 1; d <= n; d++) {
+      if (n % d === 0 && Math.abs(d - want) < Math.abs(best - want)) best = d;
+    }
+    return best;
+  }
+
+  function divisors(n) {
+    const out = [];
+    for (let d = 1; d <= n; d++) if (n % d === 0) out.push(d);
+    return out;
+  }
+
+  function clear(node) { node.innerHTML = ""; }
+
+  function colorRows(mat, r0, r1, color) {
+    for (const cell of mat.cells) {
+      const r = Number(cell.dataset.r);
+      if (r >= r0 && r <= r1) cell.style.background = color;
+    }
+  }
+
+  function colorCols(mat, c0, c1, color) {
+    for (const cell of mat.cells) {
+      const c = Number(cell.dataset.c);
+      if (c >= c0 && c <= c1) cell.style.background = color;
+    }
+  }
+
+  function colorAll(mat, color) {
+    for (const cell of mat.cells) cell.style.background = color;
+  }
+
+  function renderKey(rootId, p) {
+    const root = document.getElementById(rootId);
+    clear(root);
+    const header = document.createElement("span");
+    header.className = "legend-item";
+    header.innerHTML = "<strong>partition</strong>";
+    root.appendChild(header);
+    for (let i = 0; i < p; i++) {
+      const item = document.createElement("span");
+      item.className = "legend-item";
+      item.innerHTML = `<span class="swatch" style="background:${PART_COLORS[i]}"></span>${i + 1}: ${colorName(i)}`;
+      root.appendChild(item);
+    }
+  }
+
+  function colorName(i) {
+    const names = ["blue", "purple", "green", "gold", "rose", "cyan", "lavender", "orange", "mint"];
+    return names[i] || "color";
+  }
+
+  function partColor(i) {
+    return PART_COLORS[i % PART_COLORS.length];
+  }
+
+  function addOp(root, ch) {
+    const op = document.createElement("div");
+    op.className = "op";
+    op.textContent = ch;
+    root.appendChild(op);
+  }
+
+  function addSymbolicEquation(root, lhs, stem, p, finalLabel) {
+    const row = document.createElement("div");
+    row.className = "tp-row";
+    root.appendChild(row);
+
+    const eq = document.createElement("div");
+    eq.className = "sum-eq";
+
+    const lhsEl = document.createElement("div");
+    lhsEl.className = "sum-lhs-line";
+    lhsEl.textContent = lhs;
+    eq.appendChild(lhsEl);
+
+    const rhs = document.createElement("div");
+    rhs.className = "sum-rhs-line";
+
+    for (let i = 0; i < p; i++) {
+      const chip = document.createElement("span");
+      chip.className = "sym-chip";
+      chip.style.background = PART_COLORS[i % PART_COLORS.length];
+      chip.textContent = `${stem}_${i + 1}`;
+      rhs.appendChild(chip);
+      if (i < p - 1) {
+        const plus = document.createElement("span");
+        plus.className = "sym-plus";
+        plus.textContent = "+";
+        rhs.appendChild(plus);
+      }
+    }
+
+    const eq2 = document.createElement("span");
+    eq2.className = "sym-plus";
+    eq2.textContent = "=";
+    rhs.appendChild(eq2);
+
+    const out = document.createElement("span");
+    out.className = "sym-chip";
+    out.textContent = finalLabel;
+    rhs.appendChild(out);
+    eq.appendChild(rhs);
+
+    row.appendChild(eq);
+  }
+
+  function makeMatrix(root, title, rows, cols, clickFn = null) {
+    const box = document.createElement("div");
+    box.className = "mat";
+
+    const label = document.createElement("div");
+    label.className = "mat-title";
+    label.textContent = title;
+    box.appendChild(label);
+
+    const grid = document.createElement("div");
+    grid.className = "grid";
+    grid.style.gridTemplateColumns = `repeat(${cols}, 22px)`;
+
+    const cells = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cell = document.createElement("div");
+        cell.className = "cell" + (clickFn ? " click" : "");
+        cell.dataset.r = String(r);
+        cell.dataset.c = String(c);
+        if (clickFn) cell.addEventListener("click", () => clickFn(r, c));
+        grid.appendChild(cell);
+        cells.push(cell);
+      }
+    }
+
+    box.appendChild(grid);
+    root.appendChild(box);
+    return { rows, cols, cells };
+  }
+
+  function highlightRegion(mat, r0, r1, c0, c1, cls) {
+    for (const cell of mat.cells) {
+      const r = Number(cell.dataset.r);
+      const c = Number(cell.dataset.c);
+      if (r >= r0 && r <= r1 && c >= c0 && c <= c1) cell.classList.add(cls);
+    }
+  }
+
+  function highlightRows(mat, r0, r1, cls) {
+    highlightRegion(mat, r0, r1, 0, mat.cols - 1, cls);
+  }
+
+  function highlightCols(mat, c0, c1, cls) {
+    highlightRegion(mat, 0, mat.rows - 1, c0, c1, cls);
+  }
+
+  function renderDep() {
+    const M = M_FIXED;
+    const K = K_FIXED;
+    const N = N_FIXED;
+
+    if (depAnchor) {
+      depAnchor.r = Math.min(depAnchor.r, M - 1);
+      depAnchor.c = Math.min(depAnchor.c, N - 1);
+    }
+    if (depRect) {
+      depRect.r0 = Math.min(depRect.r0, M - 1);
+      depRect.r1 = Math.min(depRect.r1, M - 1);
+      depRect.c0 = Math.min(depRect.c0, N - 1);
+      depRect.c1 = Math.min(depRect.c1, N - 1);
+    }
+
+    const root = document.getElementById("dep-viz");
+    clear(root);
+
+    const A = makeMatrix(root, `A (${M}x${K})`, M, K);
+    addOp(root, "x");
+    const B = makeMatrix(root, `B (${K}x${N})`, K, N);
+    addOp(root, "=");
+    const C = makeMatrix(root, `C (${M}x${N})`, M, N, (r, c) => {
+      if (!depAnchor) {
+        depAnchor = { r, c };
+        depRect = { r0: r, r1: r, c0: c, c1: c };
+      } else {
+        depRect = {
+          r0: Math.min(depAnchor.r, r),
+          r1: Math.max(depAnchor.r, r),
+          c0: Math.min(depAnchor.c, c),
+          c1: Math.max(depAnchor.c, c)
+        };
+        depAnchor = null;
+      }
+      renderDep();
+    });
+
+    const eq = document.getElementById("dep-eq");
+    if (!depRect) {
+      eq.textContent = "Click one C cell, then click another to select an output block.";
+      return;
+    }
+    const { r0, r1, c0, c1 } = depRect;
+    eq.textContent = `C[${r0}:${r1 + 1}, ${c0}:${c1 + 1}] depends on A[${r0}:${r1 + 1}, :] and B[:, ${c0}:${c1 + 1}]`;
+    highlightRows(A, r0, r1, "hl-a");
+    highlightCols(B, c0, c1, "hl-b");
+    highlightRegion(C, r0, r1, c0, c1, "hl-sel");
+  }
+
+  function renderTileSplit() {
+    const M = M_FIXED;
+    const K = K_FIXED;
+    const N = N_FIXED;
+
+    const tm = nearestDivisor(M, Math.max(1, Math.min(M, num("tile-m", 1, 16))));
+    const tn = nearestDivisor(N, Math.max(1, Math.min(N, num("tile-n", 1, 16))));
+    document.getElementById("tile-m").value = String(tm);
+    document.getElementById("tile-n").value = String(tn);
+
+    const rowsTiles = M / tm;
+    const colsTiles = N / tn;
+    tileSel.tr = Math.max(0, Math.min(tileSel.tr, rowsTiles - 1));
+    tileSel.tc = Math.max(0, Math.min(tileSel.tc, colsTiles - 1));
+    const r0 = tileSel.tr * tm;
+    const r1 = r0 + tm - 1;
+    const c0 = tileSel.tc * tn;
+    const c1 = c0 + tn - 1;
+    const p = divisors(K)[Math.max(0, Math.min(kPIdx, divisors(K).length - 1))];
+    const chunk = K / p;
+
+    const root = document.getElementById("tile-viz");
+    clear(root);
+
+    const A = makeMatrix(root, `A (${M}x${K})`, M, K);
+    addOp(root, "x");
+    const B = makeMatrix(root, `B (${K}x${N})`, K, N);
+    addOp(root, "=");
+    const C = makeMatrix(root, `C (${M}x${N})`, M, N, (r, c) => {
+      tileSel.tr = Math.floor(r / tm);
+      tileSel.tc = Math.floor(c / tn);
+      renderTileSplit();
+      renderKSplit();
+    });
+
+    const eq = document.getElementById("tile-eq");
+    eq.textContent = `Tile C[${r0}:${r1 + 1}, ${c0}:${c1 + 1}] uses A rows [${r0}:${r1 + 1}] and B cols [${c0}:${c1 + 1}], with K split into ${p} chunks.`;
+    for (let j = 0; j < p; j++) {
+      const j0 = j * chunk;
+      const j1 = (j + 1) * chunk - 1;
+      for (const cell of A.cells) {
+        const rr = Number(cell.dataset.r), cc = Number(cell.dataset.c);
+        if (rr >= r0 && rr <= r1 && cc >= j0 && cc <= j1) cell.style.background = partColor(j);
+      }
+      for (const cell of B.cells) {
+        const rr = Number(cell.dataset.r), cc = Number(cell.dataset.c);
+        if (rr >= j0 && rr <= j1 && cc >= c0 && cc <= c1) cell.style.background = partColor(j);
+      }
+    }
+    highlightRegion(C, r0, r1, c0, c1, "hl-c");
+  }
+
+  function renderRowSplit() {
+    const M = M_FIXED;
+    const K = K_FIXED;
+    const N = N_FIXED;
+    const ps = divisors(M);
+    rowPIdx = Math.max(0, Math.min(rowPIdx, ps.length - 1));
+    const p = ps[rowPIdx];
+    document.getElementById("row-p").textContent = String(p);
+    document.getElementById("row-hint").textContent = `Valid p for M=${M}: ${ps.join(", ")}.`;
+    renderKey("row-key", p);
+
+    const root = document.getElementById("row-viz");
+    clear(root);
+
+    const A = makeMatrix(root, `A (M/p K): ${M}x${K}`, M, K);
+    addOp(root, "x");
+    const B = makeMatrix(root, `B (K N): ${K}x${N}`, K, N);
+    addOp(root, "=");
+    const C = makeMatrix(root, `C (M/p N): ${M}x${N}`, M, N);
+
+    const h = M / p;
+    for (let i = 0; i < p; i++) {
+      const r0 = i * h;
+      const r1 = (i + 1) * h - 1;
+      const color = PART_COLORS[i % PART_COLORS.length];
+      colorRows(A, r0, r1, color);
+      colorRows(C, r0, r1, color);
+    }
+
+  }
+
+  function renderColSplit() {
+    const M = M_FIXED;
+    const K = K_FIXED;
+    const N = N_FIXED;
+    const ps = divisors(N);
+    colPIdx = Math.max(0, Math.min(colPIdx, ps.length - 1));
+    const p = ps[colPIdx];
+    document.getElementById("col-p").textContent = String(p);
+    document.getElementById("col-hint").textContent = `Valid p for N=${N}: ${ps.join(", ")}.`;
+    renderKey("col-key", p);
+
+    const root = document.getElementById("col-viz");
+    clear(root);
+
+    const A = makeMatrix(root, `A (M K): ${M}x${K}`, M, K);
+    addOp(root, "x");
+    const B = makeMatrix(root, `B (K N/p): ${K}x${N}`, K, N);
+    addOp(root, "=");
+    const C = makeMatrix(root, `C (M N/p): ${M}x${N}`, M, N);
+
+    const w = N / p;
+    for (let i = 0; i < p; i++) {
+      const c0 = i * w;
+      const c1 = (i + 1) * w - 1;
+      const color = PART_COLORS[i % PART_COLORS.length];
+      colorCols(B, c0, c1, color);
+      colorCols(C, c0, c1, color);
+    }
+
+  }
+
+  function renderContractSplit() {
+    const M = M_FIXED;
+    const K = K_FIXED;
+    const N = N_FIXED;
+    const ps = divisors(K);
+    ctPIdx = Math.max(0, Math.min(ctPIdx, ps.length - 1));
+    const p = ps[ctPIdx];
+    document.getElementById("ct-p").textContent = String(p);
+    const chunk = K / p;
+
+    document.getElementById("ct-eq-dot").textContent =
+      `One dot product: compute p partial dot products, then sum.`;
+    const dotRoot = document.getElementById("ct-dot-viz");
+    clear(dotRoot);
+    const dotOverview = document.createElement("div");
+    dotOverview.className = "tp-row";
+    dotRoot.appendChild(dotOverview);
+    const aAll = makeMatrix(dotOverview, `a (1x${K})`, 1, K);
+    addOp(dotOverview, "x");
+    const bAll = makeMatrix(dotOverview, `b (${K}x1)`, K, 1);
+    for (let i = 0; i < p; i++) {
+      const k0 = i * chunk;
+      const k1 = (i + 1) * chunk - 1;
+      for (const cell of aAll.cells) {
+        const cc = Number(cell.dataset.c);
+        if (cc >= k0 && cc <= k1) cell.style.background = partColor(i);
+      }
+      for (const cell of bAll.cells) {
+        const rr = Number(cell.dataset.r);
+        if (rr >= k0 && rr <= k1) cell.style.background = partColor(i);
+      }
+    }
+    const dotOverviewSep = document.createElement("hr");
+    dotOverviewSep.className = "part-sep";
+    dotRoot.appendChild(dotOverviewSep);
+
+    for (let i = 0; i < p; i++) {
+      const k0 = i * chunk;
+      const k1 = (i + 1) * chunk - 1;
+      const row = document.createElement("div");
+      row.className = "tp-part-row";
+      dotRoot.appendChild(row);
+      const tag = document.createElement("span");
+      tag.className = "tp-tag";
+      tag.style.background = PART_DARK[i % PART_DARK.length];
+      tag.textContent = `Partition ${i + 1}`;
+      row.appendChild(tag);
+      const ai = makeMatrix(row, `a[${k0}:${k1 + 1}]`, 1, chunk);
+      addOp(row, "x");
+      const bi = makeMatrix(row, `b[${k0}:${k1 + 1}]`, chunk, 1);
+      addOp(row, "=");
+      const ci = makeMatrix(row, `c_${i + 1}`, 1, 1);
+      colorAll(ai, partColor(i));
+      colorAll(bi, partColor(i));
+      colorAll(ci, partColor(i));
+      if (i < p - 1) {
+        const sep = document.createElement("hr");
+        sep.className = "part-sep";
+        dotRoot.appendChild(sep);
+      }
+    }
+
+    const dotFinalSep = document.createElement("hr");
+    dotFinalSep.className = "part-sep";
+    dotRoot.appendChild(dotFinalSep);
+    addSymbolicEquation(dotRoot, "a x b =", "c", p, "c");
+
+    document.getElementById("ct-eq-mm").textContent =
+      `Matmul case: compute p partial matmuls, then sum.`;
+    const mmRoot = document.getElementById("ct-mm-viz");
+    clear(mmRoot);
+    const mmOverview = document.createElement("div");
+    mmOverview.className = "tp-row";
+    mmRoot.appendChild(mmOverview);
+    const AAll = makeMatrix(mmOverview, `A (${M}x${K})`, M, K);
+    addOp(mmOverview, "x");
+    const BAll = makeMatrix(mmOverview, `B (${K}x${N})`, K, N);
+    for (let i = 0; i < p; i++) {
+      const k0 = i * chunk;
+      const k1 = (i + 1) * chunk - 1;
+      for (const cell of AAll.cells) {
+        const cc = Number(cell.dataset.c);
+        if (cc >= k0 && cc <= k1) cell.style.background = partColor(i);
+      }
+      for (const cell of BAll.cells) {
+        const rr = Number(cell.dataset.r);
+        if (rr >= k0 && rr <= k1) cell.style.background = partColor(i);
+      }
+    }
+    const mmOverviewSep = document.createElement("hr");
+    mmOverviewSep.className = "part-sep";
+    mmRoot.appendChild(mmOverviewSep);
+
+    for (let i = 0; i < p; i++) {
+      const k0 = i * chunk;
+      const k1 = (i + 1) * chunk - 1;
+      const row = document.createElement("div");
+      row.className = "tp-part-row";
+      mmRoot.appendChild(row);
+      const tag = document.createElement("span");
+      tag.className = "tp-tag";
+      tag.style.background = PART_DARK[i % PART_DARK.length];
+      tag.textContent = `Partition ${i + 1}`;
+      row.appendChild(tag);
+      const Ai = makeMatrix(row, `A[:, ${k0}:${k1 + 1}]`, M, chunk);
+      addOp(row, "x");
+      const Bi = makeMatrix(row, `B[${k0}:${k1 + 1}, :]`, chunk, N);
+      addOp(row, "=");
+      const Ci = makeMatrix(row, `C_${i + 1}`, M, N);
+      colorAll(Ai, partColor(i));
+      colorAll(Bi, partColor(i));
+      colorAll(Ci, partColor(i));
+      if (i < p - 1) {
+        const sep = document.createElement("hr");
+        sep.className = "part-sep";
+        mmRoot.appendChild(sep);
+      }
+    }
+
+    const mmFinalSep = document.createElement("hr");
+    mmFinalSep.className = "part-sep";
+    mmRoot.appendChild(mmFinalSep);
+    addSymbolicEquation(mmRoot, "A x B =", "C", p, "C");
+  }
+
+  function renderKSplit() {
+    const M = M_FIXED;
+    const K = K_FIXED;
+    const N = N_FIXED;
+    const tm = nearestDivisor(M, Math.max(1, Math.min(M, num("tile-m", 1, 16))));
+    const tn = nearestDivisor(N, Math.max(1, Math.min(N, num("tile-n", 1, 16))));
+    const rowsTiles = M / tm;
+    const colsTiles = N / tn;
+    tileSel.tr = Math.max(0, Math.min(tileSel.tr, rowsTiles - 1));
+    tileSel.tc = Math.max(0, Math.min(tileSel.tc, colsTiles - 1));
+    const r0 = tileSel.tr * tm;
+    const r1 = r0 + tm - 1;
+    const c0 = tileSel.tc * tn;
+    const c1 = c0 + tn - 1;
+    const Mh = r1 - r0 + 1;
+    const Nw = c1 - c0 + 1;
+
+    const ps = divisors(K);
+    kPIdx = Math.max(0, Math.min(kPIdx, ps.length - 1));
+    const p = ps[kPIdx];
+    document.getElementById("k-p").textContent = String(p);
+    kStep = Math.max(0, Math.min(kStep, p));
+    const chunk = K / p;
+    const stepLbl = document.getElementById("k-step-label");
+    const slider = document.getElementById("k-slider");
+    slider.max = String(p);
+    slider.value = String(kStep);
+    if (kStep === 0) {
+      document.getElementById("k-eq").textContent =
+        `Initialize accumulator to zeros for C[${r0}:${r1 + 1}, ${c0}:${c1 + 1}].`;
+      stepLbl.textContent = `init (0/${p})`;
+      document.getElementById("k-summary").textContent =
+        `Selected tile C[${r0}:${r1 + 1}, ${c0}:${c1 + 1}] | next K chunk: 1/${p}`;
+    } else if (kStep <= p) {
+      const part = kStep - 1;
+      const k0 = part * chunk;
+      const k1 = (part + 1) * chunk - 1;
+      document.getElementById("k-eq").textContent =
+        `accumulator += A_chunk x B_chunk`;
+      stepLbl.textContent = `partition ${kStep}/${p}`;
+      document.getElementById("k-summary").textContent =
+        `Selected tile C[${r0}:${r1 + 1}, ${c0}:${c1 + 1}] | Step ${kStep}/${p}: accumulator += A_chunk x B_chunk | K chunk: [${k0}:${k1 + 1}]`;
+    }
+
+    const curRoot = document.getElementById("k-viz-current");
+    clear(curRoot);
+    const row = document.createElement("div");
+    row.className = "tp-part-row";
+    curRoot.appendChild(row);
+    const ChunkColor = kStep > 0 ? partColor(kStep - 1) : "#cbd5e1";
+    const AccColor = "#5eead4";
+
+    if (kStep > 0 && kStep <= p) {
+      const part = kStep - 1;
+      const k0 = part * chunk;
+      const k1 = (part + 1) * chunk - 1;
+      const tag = document.createElement("span");
+      tag.className = "tp-tag";
+      tag.style.background = PART_DARK[part % PART_DARK.length];
+      tag.textContent = `Partition ${kStep}`;
+      row.appendChild(tag);
+      const Acc2 = makeMatrix(row, `Accumulator`, Mh, Nw);
+      const doneNow = Math.min(Math.max(kStep, 0), p);
+      for (const cell of Acc2.cells) {
+        cell.style.background = doneNow >= p ? AccColor : "#ccfbf1";
+      }
+      addOp(row, "+=");
+      const As = makeMatrix(row, `A_chunk [${r0}:${r1 + 1}, ${k0}:${k1 + 1}]`, Mh, chunk);
+      addOp(row, "x");
+      const Bs = makeMatrix(row, `B_chunk [${k0}:${k1 + 1}, ${c0}:${c1 + 1}]`, chunk, Nw);
+      colorAll(As, ChunkColor);
+      colorAll(Bs, ChunkColor);
+    } else {
+      const tag = document.createElement("span");
+      tag.className = "tp-tag";
+      tag.style.background = "#64748b";
+      tag.textContent = "Init";
+      row.appendChild(tag);
+      const zero = makeMatrix(row, `Accumulator (zeros)`, Mh, Nw);
+      colorAll(zero, "#ffffff");
+    }
+
+    const fullRoot = document.getElementById("k-viz-full");
+    clear(fullRoot);
+    const r2 = document.createElement("div");
+    r2.className = "tp-row";
+    fullRoot.appendChild(r2);
+    const doneSteps = Math.min(Math.max(kStep, 0), p);
+    const lastAdded = doneSteps * chunk;
+    const A = makeMatrix(r2, `A[:, 0:${lastAdded}] shown in full (${M}x${K})`, M, K);
+    addOp(r2, "x");
+    const B = makeMatrix(r2, `B[0:${lastAdded}, :] shown in full (${K}x${N})`, K, N);
+    addOp(r2, "=");
+    const C = makeMatrix(r2, `C (${M}x${N}) with accumulator in tile [${r0}:${r1 + 1}, ${c0}:${c1 + 1}]`, M, N);
+
+    const upto = Math.min(Math.max(kStep - 1, -1), p - 1);
+    for (let j = 0; j < p; j++) {
+      const j0 = j * chunk;
+      const j1 = (j + 1) * chunk - 1;
+      if (j <= upto) {
+        const shardCol = partColor(j);
+        for (const cell of A.cells) {
+          const rr = Number(cell.dataset.r), cc = Number(cell.dataset.c);
+          if (rr >= r0 && rr <= r1 && cc >= j0 && cc <= j1) cell.style.background = shardCol;
+        }
+        for (const cell of B.cells) {
+          const rr = Number(cell.dataset.r), cc = Number(cell.dataset.c);
+          if (rr >= j0 && rr <= j1 && cc >= c0 && cc <= c1) cell.style.background = shardCol;
+        }
+      }
+    }
+    for (const cell of C.cells) {
+      const rr = Number(cell.dataset.r);
+      const cc = Number(cell.dataset.c);
+      const inTile = rr >= r0 && rr <= r1 && cc >= c0 && cc <= c1;
+      if (inTile) {
+        cell.style.background = doneSteps >= p ? "#5eead4" : "#ccfbf1";
+      } else {
+        cell.style.background = "#ffffff";
+      }
+    }
+  }
+
+  function rerenderAll() {
+    renderDep();
+    renderTileSplit();
+    renderRowSplit();
+    renderColSplit();
+    renderContractSplit();
+    renderKSplit();
+  }
+
+  document.getElementById("row-p-dec").addEventListener("click", () => {
+    rowPIdx = Math.max(0, rowPIdx - 1);
+    renderRowSplit();
+  });
+  document.getElementById("row-p-inc").addEventListener("click", () => {
+    rowPIdx = Math.min(divisors(M_FIXED).length - 1, rowPIdx + 1);
+    renderRowSplit();
+  });
+
+  document.getElementById("col-p-dec").addEventListener("click", () => {
+    colPIdx = Math.max(0, colPIdx - 1);
+    renderColSplit();
+  });
+  document.getElementById("col-p-inc").addEventListener("click", () => {
+    colPIdx = Math.min(divisors(N_FIXED).length - 1, colPIdx + 1);
+    renderColSplit();
+  });
+
+  document.getElementById("ct-p-dec").addEventListener("click", () => {
+    ctPIdx = Math.max(0, ctPIdx - 1);
+    renderContractSplit();
+  });
+  document.getElementById("ct-p-inc").addEventListener("click", () => {
+    ctPIdx = Math.min(divisors(K_FIXED).length - 1, ctPIdx + 1);
+    renderContractSplit();
+  });
+
+  document.getElementById("k-p-dec").addEventListener("click", () => {
+    kPIdx = Math.max(0, kPIdx - 1);
+    kStep = 0;
+    renderTileSplit();
+    renderKSplit();
+  });
+  document.getElementById("k-p-inc").addEventListener("click", () => {
+    kPIdx = Math.min(divisors(K_FIXED).length - 1, kPIdx + 1);
+    kStep = 0;
+    renderTileSplit();
+    renderKSplit();
+  });
+
+  document.getElementById("k-next").addEventListener("click", () => {
+    const p = divisors(K_FIXED)[Math.max(0, Math.min(kPIdx, divisors(K_FIXED).length - 1))];
+    kStep = (kStep + 1) % (p + 1);
+    renderKSplit();
+  });
+  document.getElementById("k-prev").addEventListener("click", () => {
+    const p = divisors(K_FIXED)[Math.max(0, Math.min(kPIdx, divisors(K_FIXED).length - 1))];
+    kStep = (kStep - 1 + (p + 1)) % (p + 1);
+    renderKSplit();
+  });
+  document.getElementById("k-slider").addEventListener("input", () => {
+    kStep = Number(document.getElementById("k-slider").value);
+    renderKSplit();
+  });
+
+  function syncShapes() {
+    M_FIXED = num("shape-m", 2, 16);
+    K_FIXED = num("shape-k", 2, 16);
+    N_FIXED = num("shape-n", 2, 16);
+    const ks = divisors(K_FIXED);
+    ctPIdx = ks.includes(2) ? ks.indexOf(2) : Math.min(1, Math.max(0, ks.length - 1));
+    kPIdx = Math.max(0, ks.length - 2);
+  }
+
+  const rerenderWithShapes = () => { syncShapes(); kStep = 0; rerenderAll(); };
+  ["shape-m", "shape-k", "shape-n", "tile-m", "tile-n"].forEach(id => {
+    document.getElementById(id).addEventListener("input", rerenderWithShapes);
+  });
+
+  syncShapes();
+  rerenderAll();
+</script>
+</body>
+</html>
