@@ -446,13 +446,11 @@
 
     <section class="section">
       <h2>Splitting Non-Contracting Axes</h2>
-      <p>First split along output rows or columns. These are direct independent subproblems.</p>
       <p><strong>Split Rows (M)</strong></p>
       <div class="eq">
         <div class="shardops">M/p K, K N -&gt; M/p N</div>
         <div class="shardops-sub" id="row-shardops-sub"></div>
       </div>
-      <p>Split output rows into <code>p</code> groups. Each group is one smaller matmul over the same <code>K</code>.</p>
 
       <div class="controls">
         <div class="k-step">
@@ -471,7 +469,6 @@
         <div class="shardops">M K, K N/p -&gt; M N/p</div>
         <div class="shardops-sub" id="col-shardops-sub"></div>
       </div>
-      <p>Symmetric case for output columns: split columns into <code>p</code> groups and compute each as a smaller matmul.</p>
 
       <div class="controls">
         <div class="k-step">
