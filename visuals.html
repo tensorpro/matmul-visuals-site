@@ -429,7 +429,7 @@
   <main class="page">
     <header class="hero">
       <h1>Split One Matmul Into Smaller Matmuls</h1>
-      <p class="lead">Choose dimensions of A (M x K) and B (K x N):</p>
+      <p class="lead">Here we will describe how to split A x B into smaller matmuls. Choose dimensions of A (M x K) and B (K x N):</p>
       <div class="controls">
         <label class="ctrl">M <input id="shape-m" type="number" min="2" max="16" value="8"></label>
         <label class="ctrl">K <input id="shape-k" type="number" min="2" max="16" value="8"></label>
@@ -773,7 +773,7 @@
 
     const eq = document.getElementById("dep-eq");
     if (!depRect) {
-      eq.textContent = "Click two cells in C to select a region in the output. The region of the inputs it depends on will be highlighted.";
+      eq.textContent = "";
       return;
     }
     const { r0, r1, c0, c1 } = depRect;
@@ -875,7 +875,7 @@
     colPIdx = Math.max(0, Math.min(colPIdx, ps.length - 1));
     const p = ps[colPIdx];
     document.getElementById("col-p").textContent = String(p);
-    document.getElementById("col-hint").textContent = `Valid p for N=${N}: ${ps.join(", ")}.`;
+    document.getElementById("col-hint").textContent = "";
     document.getElementById("col-shardops-sub").textContent = `(N/p) = ${N / p}`;
     renderKey("col-key", p);
 
@@ -1122,9 +1122,9 @@
     fullRoot.appendChild(r2);
     const doneSteps = Math.min(Math.max(kStep, 0), p);
     const lastAdded = doneSteps * chunk;
-    const A = makeMatrix(r2, `A[:, 0:${lastAdded}] shown in full (${M}x${K})`, M, K);
+    const A = makeMatrix(r2, `A[:, 0:${lastAdded}]`, M, K);
     addOp(r2, "x");
-    const B = makeMatrix(r2, `B[0:${lastAdded}, :] shown in full (${K}x${N})`, K, N);
+    const B = makeMatrix(r2, `B[0:${lastAdded}, :]`, K, N);
     addOp(r2, "=");
     const C = makeMatrix(r2, `C (${M}x${N}) with accumulator in tile [${r0}:${r1 + 1}, ${c0}:${c1 + 1}]`, M, N);
 
